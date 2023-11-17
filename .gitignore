@@ -1,0 +1,23 @@
+*.DS_Store
+*.pyc
+*.swp
+# *.ipynb
+temp/*
+dist/*
+build/*
+docs/site/*
+docs/theme/*
+docs/sources/*
+tags
+examples/img/*
+
+# test-related
+.coverage
+.cache
+.pytest_cache
+.ipynb*
+*.egg-info*
+
+# developer environments
+.idea
+.vscode
