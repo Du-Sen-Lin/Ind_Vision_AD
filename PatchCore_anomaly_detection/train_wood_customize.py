@@ -351,7 +351,7 @@ def get_args():
     import argparse
     parser = argparse.ArgumentParser(description='ANOMALYDETECTION')
     parser.add_argument('--phase', choices=['train','test'], default='train')
-    parser.add_argument('--dataset_path', default=r'/root/dataset/wood/ort/trt/Research/industry_data')
+    parser.add_argument('--dataset_path', default=r'/root/dataset/public/GM06_08')
     parser.add_argument('--category', default='GM06_08')
     # num_epochs: patchCore 没有 PaDiM 那样的训练阶段（神经网络）,在代码中它只是提取特征而不更新参数。epochs=1
     parser.add_argument('--num_epochs', default=1)
@@ -360,7 +360,7 @@ def get_args():
     parser.add_argument('--input_size', default=224)
     # coreset_sampling_ratio 
     parser.add_argument('--coreset_sampling_ratio', default=0.01)
-    parser.add_argument('--project_root_path', default=r'/root/project/wood/ort/trt/research/wdcv/demo/anomaly_detection/models/patchcore')
+    parser.add_argument('--project_root_path', default=r'/root/project/ad_algo/anomaly_detection/PatchCore_anomaly_detection/models/patchcore')
     parser.add_argument('--save_src_code', default=True)
     parser.add_argument('--save_anomaly_map', default=True)
     parser.add_argument('--n_neighbors', type=int, default=9)

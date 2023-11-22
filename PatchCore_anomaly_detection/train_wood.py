@@ -95,6 +95,8 @@ def embedding_concat(x, y):
     return z
 
 def reshape_embedding(embedding):
+    """将输入的多维张量 embedding 重新形状为一维列表 embedding_list
+    """
     embedding_list = []
     for k in range(embedding.shape[0]):
         for i in range(embedding.shape[2]):
@@ -206,7 +208,7 @@ class PatchCore(pl.LightningModule):
         # 放弃了局部正常特征数据较少、偏向于分类任务的深层特征，采用第 [2, 3] 层特征作为图像特征
         self.model.layer2[-1].register_forward_hook(hook_t)
         self.model.layer3[-1].register_forward_hook(hook_t)
-        # 损失函数：均方损失函数
+        # 损失函数：均方损失函数 MSE是回归问题中常用的损失函数，它度量模型的预测值与实际目标值之间的平方差的平均值。patchcore中不需要损失函数，不做训练。
         self.criterion = torch.nn.MSELoss(reduction='sum')
         # 初始化结果列表
         self.init_results_list()
@@ -221,7 +223,15 @@ class PatchCore(pl.LightningModule):
                         transforms.Resize((args.load_size, args.load_size)),
                         transforms.ToTensor(),
                         transforms.CenterCrop(args.input_size)])
-        # ？？？
+        """transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])； 
+        transforms.Normalize()数据标准化；Normalize()函数的作用是将数据转换为标准高斯分布，即逐channel的对图像进行标准化（将图像的每个通道标准化为均值为0、标准差为1的分布），可以加快模型的收敛。
+        前面的mean和std是Imagenet数据集的均值和标准差。
+        """
+        """inv_normalize（逆归一化）通常是指与上述 transforms.Normalize 相反的操作。
+        而 transforms.Normalize 对图像进行标准化，将图像的每个通道减去均值并除以标准差。
+        逆归一化则是将已经标准化的图像还原回原始图像:乘以标准差（std）：对于每个通道，都乘以相应通道的标准差,加上均值（mean）：对于每个通道，都加上相应通道的均值。
+        下面逆归一化：对每个通道，乘以标准差的倒数，对每个通道，加上均值的相反数。 逆归一化的操作可以应用于已经通过均值和标准差标准化过的图像，将其还原为原始范围和分布。
+        """
         self.inv_normalize = transforms.Normalize(mean=[-0.485/0.229, -0.456/0.224, -0.406/0.255], std=[1/0.229, 1/0.224, 1/0.255])
 
     def init_results_list(self):
@@ -311,28 +321,36 @@ class PatchCore(pl.LightningModule):
         features = self(x)
         embeddings = []
         for feature in features:
-            m = torch.nn.AvgPool2d(3, 1, 1)
-            embeddings.append(m(feature))
-        embedding = embedding_concat(embeddings[0], embeddings[1])
-        self.embedding_list.extend(reshape_embedding(np.array(embedding)))
+            # 特征值：以（h,w)为中⼼的邻居点集得到，论⽂中说使⽤adaptive average pooling. 实验使⽤AvgPool2d，指标更⾼。
+            m = torch.nn.AvgPool2d(3, 1, 1) # 对每个特征使用 torch.nn.AvgPool2d(3, 1, 1) 进行平均池化操作。这个操作对每个区域使用 3x3 的窗口进行池化，步幅为 1，填充为 1。
+            embeddings.append(m(feature)) # 将每个平均池化后的特征存储在 embeddings 列表中。
+        embedding = embedding_concat(embeddings[0], embeddings[1]) # 将平均池化后的特征通过 embedding_concat 函数进行拼接
+        self.embedding_list.extend(reshape_embedding(np.array(embedding))) # 对于输入张量的每个样本，对其进行逐行展开，将每个像素的特征值添加到列表中。
 
     def training_epoch_end(self, outputs): 
         print(f"#### training_epoch_end")
         # Memory Bank:将收集到的正常图像 Patch 特征放入 MemoryBank
         total_embeddings = np.array(self.embedding_list)
         # Random projection  随机投影  Johnson-Lindenstrauss 定理
-        # 稀疏随机矩阵：使用稀疏随机矩阵，通过投影原始输入空间来降低维度。
+        # 稀疏随机矩阵：使用稀疏随机矩阵，通过投影原始输入空间来降低维度。SparseRandomProjection：该类是scikit-learn库中用于稀疏随机投影的实现。
+        # n_components='auto'， 这表示投影到的目标维度数量。设置为'auto'时，该数量将由Johnson-Lindenstrauss定理自动选择，以保持数据之间的距离不变。
+        # eps=0.9：这是Johnson-Lindenstrauss定理中的一个参数，表示在维度减小后，数据点之间的距离可以保持不变的概率。0.9是一个常用的默认值。
+        # 通过降低数据的维度来减少计算和内存需求，同时尽量保持数据之间的距离关系。这对于处理高维数据，尤其是在异常检测任务中，可以提高效率。
         self.randomprojector = SparseRandomProjection(n_components='auto', eps=0.9) # 'auto' => Johnson-Lindenstrauss lemma
         self.randomprojector.fit(total_embeddings)
         # Coreset Subsampling 核心集二次抽样:稀疏采样 Reduce memory bank
         # 参考 https://github.com/google/active-learning/blob/master/sampling_methods/kcenter_greedy.py 
+        # kCenterGreedy 是一个选择核心集的算法，该算法通过贪心地选择距离当前已选样本最远的样本，以最小化这些样本对总体方差的贡献。这有助于在保持数据分布特征的同时，减小数据集的大小。
         selector = kCenterGreedy(total_embeddings,0,0)
+        # selector.select_batch 用于选择样本的索引
+        # 使用了随机投影模型 self.randomprojector，通过 N 表示要选择的样本数，以及 args.coreset_sampling_ratio 指定了选择样本的比例。
         selected_idx = selector.select_batch(model=self.randomprojector, already_selected=[], N=int(total_embeddings.shape[0]*args.coreset_sampling_ratio))
+        # selected_idx 包含了被选择的样本的索引，然后通过这些索引从原始的 total_embeddings 中提取核心集的样本。
         self.embedding_coreset = total_embeddings[selected_idx]
-        
+        # 打印初始和最终的 Memory Bank 大小。
         print('initial embedding size : ', total_embeddings.shape)
         print('final embedding size : ', self.embedding_coreset.shape)
-        #faiss
+        #faiss 使用 Faiss 建立索引，以便后续在测试阶段进行相似度搜索。 Faiss 库，一个用于高效相似性搜索和聚类的库
         self.index = faiss.IndexFlatL2(self.embedding_coreset.shape[1])
         self.index.add(self.embedding_coreset) 
         faiss.write_index(self.index,  os.path.join(self.embedding_dir_path,'index.faiss'))
@@ -341,17 +359,18 @@ class PatchCore(pl.LightningModule):
     def test_step(self, batch, batch_idx): # Nearest Neighbour Search 最近邻搜索
         # print(f"#### test_step")
         x, gt, label, file_name, x_type = batch
-        # extract embedding
+        # extract embedding 提取特征
         features = self(x)
-        embeddings = []
+        embeddings = []                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
         for feature in features:
             m = torch.nn.AvgPool2d(3, 1, 1)
             embeddings.append(m(feature))
         embedding_ = embedding_concat(embeddings[0], embeddings[1])
         embedding_test = np.array(reshape_embedding(np.array(embedding_)))
-        score_patches, _ = self.index.search(embedding_test , k=args.n_neighbors)
+        score_patches, _ = self.index.search(embedding_test , k=args.n_neighbors) # 在 Faiss 索引中进行最近邻搜索，得到每个样本的异常分数 score_patches。
+        # score_patches[:, 0] 获取测试样本的最近邻中第一个样本的异常分数。这个分数通常代表了测试样本与其最近邻之间的距离或相似度。这将被用于计算最终的异常分数。
         anomaly_map = score_patches[:,0].reshape((28,28))
-        N_b = score_patches[np.argmax(score_patches[:,0])]
+        N_b = score_patches[np.argmax(score_patches[:,0])] # 获取在最近邻搜索中，具有最高异常分数的那个最近邻的相关信息。np.argmax(score_patches[:, 0]) 返回最近邻中具有最高异常分数的样本的索引。
         # 论文解释：
         '''
         To obtain s, we use a scaling w on s∗ to account for the behaviour of neighbouring patches: 
@@ -360,21 +379,26 @@ class PatchCore(pl.LightningModule):
             we increase the anomaly score
             如果内存库特征最接近异常候选 m^test,* , m^*, 本身距离近邻样本相对较远，因此是少见的正常发生，使用权重增加异常分数。 
             相当于计算了一个softmax
+            我的理解为：对于特征系数的区域倾向于判定为异常 （在特征系数的区域内 ，分子较小，异常值会更大），
+            反正给予异常值一定的削减（否则，分子/分母 会更大，异常值会减弱。）每个点的异常值拼接起来即可获得图像的异常热力图。
+            对于产品不稳定有一定的兼容性和鲁棒性。
         '''
-        w = (1 - (np.max(np.exp(N_b))/np.sum(np.exp(N_b))))
-        score = w*max(score_patches[:,0]) # Image-level score
+        # 根据论文中的公式计算异常分数
+        w = (1 - (np.max(np.exp(N_b))/np.sum(np.exp(N_b)))) # 权重
+        score = w*max(score_patches[:,0]) # Image-level score , max 选择距离最远的异常值, 距离最远的点为图像的异常值分数; 再乘以权重。
         gt_np = gt.cpu().numpy()[0,0].astype(int)
         # 将结果放大：匹配原始输入分辨率
         anomaly_map_resized = cv2.resize(anomaly_map, (args.input_size, args.input_size))
         # 高斯平滑
         anomaly_map_resized_blur = gaussian_filter(anomaly_map_resized, sigma=4)
-        self.gt_list_px_lvl.extend(gt_np.ravel())
-        self.pred_list_px_lvl.extend(anomaly_map_resized_blur.ravel())
-        self.gt_list_img_lvl.append(label.cpu().numpy()[0])
-        self.pred_list_img_lvl.append(score)
+        # 记录真实标签和预测分数
+        self.gt_list_px_lvl.extend(gt_np.ravel()) # 真实
+        self.pred_list_px_lvl.extend(anomaly_map_resized_blur.ravel()) # 预测
+        self.gt_list_img_lvl.append(label.cpu().numpy()[0]) # 真实标签
+        self.pred_list_img_lvl.append(score) # 预测分数
         self.img_path_list.extend(file_name)
         # save images
-        x = self.inv_normalize(x)
+        x = self.inv_normalize(x) # 逆归一化：对每个通道，乘以标准差的倒数，对每个通道，加上均值的相反数。 逆归一化的操作可以应用于已经通过均值和标准差标准化过的图像，将其还原为原始范围和分布。
         input_x = cv2.cvtColor(x.permute(0,2,3,1).cpu().numpy()[0]*255, cv2.COLOR_BGR2RGB)
         self.save_anomaly_map(anomaly_map_resized_blur, input_x, gt_np*255, file_name[0], x_type[0])
 
@@ -395,7 +419,7 @@ def get_args():
     import argparse
     parser = argparse.ArgumentParser(description='ANOMALYDETECTION')
     parser.add_argument('--phase', choices=['train','test'], default='train')
-    parser.add_argument('--dataset_path', default=r'/root/dataset/public/Research/DataSet/Anomaly_Detect/MVTec_AD/mvtec_anomaly_detection')
+    parser.add_argument('--dataset_path', default=r'/root/dataset/public/mvtec_anomaly_detection')
     parser.add_argument('--category', default='bottle')
     # num_epochs: patchCore 没有 PaDiM 那样的训练阶段（神经网络）,在代码中它只是提取特征而不更新参数。epochs=1
     parser.add_argument('--num_epochs', default=1)
@@ -404,7 +428,7 @@ def get_args():
     parser.add_argument('--input_size', default=224)
     # coreset_sampling_ratio 
     parser.add_argument('--coreset_sampling_ratio', default=0.1)
-    parser.add_argument('--project_root_path', default=r'/root/project/wood/ort/trt/research/wdcv/demo/anomaly_detection/models/patchcore')
+    parser.add_argument('--project_root_path', default=r'/root/project/ad_algo/anomaly_detection/PatchCore_anomaly_detection/models/patchcore')
     parser.add_argument('--save_src_code', default=True)
     parser.add_argument('--save_anomaly_map', default=True)
     parser.add_argument('--n_neighbors', type=int, default=9)
