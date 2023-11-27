@@ -18,6 +18,10 @@ MVTEC_CATEGORIES = [
     "zipper",
 ]
 
+Custom_CATEGORIES = [
+    "bottle_in"
+]
+
 BACKBONE_DEIT = "deit_base_distilled_patch16_384"
 BACKBONE_CAIT = "cait_m48_448"
 BACKBONE_RESNET18 = "resnet18"

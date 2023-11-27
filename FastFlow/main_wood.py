@@ -168,13 +168,13 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train FastFlow on MVTec-AD dataset")
     # wide_resnet50_2.yaml resnet18.yaml
     parser.add_argument(
-        "-cfg", "--config", default="/root/project/wood/ort/trt/research/wdcv/demo/anomaly_detection/FastFlow/configs/resnet18.yaml", type=str, help="path to config file"
+        "-cfg", "--config", default="/root/project/ad_algo/anomaly_detection/FastFlow/configs/resnet18.yaml", type=str, help="path to config file"
     )
-    parser.add_argument("--data", default=r'/root/dataset/public/Research/DataSet/Anomaly_Detect/MVTec_AD/mvtec_anomaly_detection', type=str, help="path to mvtec folder")
+    parser.add_argument("--data", default=r'/root/dataset/public/mvtec_anomaly_detection', type=str, help="path to mvtec folder")
     parser.add_argument(
         "-cat",
         "--category",
-        default="carpet",
+        default="bottle",
         type=str,
         choices=const.MVTEC_CATEGORIES,
         help="category name in mvtec",

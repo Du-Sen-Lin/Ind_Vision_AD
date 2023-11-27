@@ -173,15 +173,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train FastFlow on MVTec-AD dataset")
     # wide_resnet50_2.yaml resnet18.yaml
     parser.add_argument(
-        "-cfg", "--config", default="/root/project/wood/ort/trt/research/wdcv/demo/anomaly_detection/FastFlow/configs/resnet18.yaml", type=str, help="path to config file"
+        "-cfg", "--config", default="/root/project/ad_algo/anomaly_detection/FastFlow/configs/resnet18.yaml", type=str, help="path to config file"
     )
-    parser.add_argument("--data", default=r'/root/dataset/wood/ort/trt/Research/industry_data', type=str, help="path to data folder")
+    parser.add_argument("--data", default=r'/root/dataset/public/bottle_in', type=str, help="path to data folder")
     parser.add_argument(
         "-cat",
         "--category",
-        default="carpet_in",
+        default="bottle_in",
         type=str,
-        choices=const.MVTEC_CATEGORIES,
+        choices=const.Custom_CATEGORIES,
         help="category name in mvtec",
     )
     parser.add_argument("--eval", action="store_true", help="run eval only")
@@ -219,4 +219,4 @@ GM06_08
 # train
 # !python main_wood_customize.py
 # eval
-# !python main.py --eval -ckpt _fastflow_experiment_checkpoints/exp[index]/[epoch#].pt
+# python main_wood_customize.py -cfg configs/resnet18.yaml --data /root/dataset/public/bottle_in -cat bottle_in --eval -ckpt _fastflow_experiment_checkpoints/exp2/49.pt
