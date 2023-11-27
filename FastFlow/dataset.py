@@ -17,10 +17,12 @@ class MVTecDataset(torch.utils.data.Dataset):
             ]
         )
         if is_train:
+            print(f"@@ train root: {root}, category: {category}.")
             self.image_files = glob(
                 os.path.join(root, category, "train", "good", "*.png")
             )
         else:
+            print(f"@@ test root: {root}, category: {category}.")
             self.image_files = glob(os.path.join(root, category, "test", "*", "*.png"))
             self.target_transform = transforms.Compose(
                 [
@@ -50,3 +52,39 @@ class MVTecDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.image_files)
+
+
+class CustomDataset(torch.utils.data.Dataset):
+    def __init__(self, root, category, input_size, is_train=True):
+        self.image_transform = transforms.Compose(
+            [
+                transforms.Resize(input_size),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        )
+        if is_train:
+            print(f"@@ train root: {root}, category: {category}.")
+            self.image_files = glob(
+                os.path.join(root, category, "train", "good", "*.png")
+            )
+        else:
+            print(f"@@ test root: {root}, category: {category}.")
+            self.image_files = glob(os.path.join(root, category, "test", "*", "*.png"))
+        self.is_train = is_train
+
+    def __getitem__(self, index):
+        image_file = self.image_files[index]
+        image = Image.open(image_file)
+        image = self.image_transform(image)
+        if self.is_train:
+            return image
+        else:
+            if os.path.dirname(image_file).endswith("good"):
+                target = torch.zeros([1]) # OK label: 0
+            else:
+                target = torch.ones([1]) # NG label: 1
+            return image, target
+
+    def __len__(self):
+        return len(self.image_files)    

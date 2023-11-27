@@ -94,9 +94,17 @@ def eval_once(dataloader, model):
         data, targets = data.cuda(), targets.cuda()
         with torch.no_grad():
             ret = model(data)
-        outputs = ret["anomaly_map"].cpu().detach()
+        outputs = ret["anomaly_map"].cpu().detach() # detach阻断反向传播，返回值仍为tensor
+        # outputs = outputs.flatten()
+        # targets = targets.flatten()
+        print(f"@@ outputs: {outputs.shape} type: {outputs.dtype}")
+        print(f"@@ targets: {targets.shape} type: {targets.dtype}")
         outputs = outputs.flatten()
-        targets = targets.flatten()
+        targets = targets.flatten().type(torch.int32)
+        # print(f"@@ outputs: {outputs.shape} , {outputs[:6]},  type: {outputs.dtype}")
+        # print(f"@@ targets: {targets.shape} , {targets[:6]},  type: {targets.dtype}")
+        print(f"@@ outputs: {outputs.shape} , {outputs[:65536].max()},  type: {outputs.dtype}")
+        print(f"@@ targets: {targets.shape} , {targets[:65536].max()},  type: {targets.dtype}")
         auroc_metric.update((outputs, targets))
     auroc = auroc_metric.compute()
     print("AUROC: {}".format(auroc))
@@ -113,8 +121,10 @@ def train(args):
     model = build_model(config)
     optimizer = build_optimizer(model)
 
+    print(f"@@ args: {args} \n \t config: {config}")
     train_dataloader = build_train_data_loader(args, config)
     test_dataloader = build_test_data_loader(args, config)
+    print(f"@@ train_dataloader: {len(train_dataloader)} test_dataloader: {len(test_dataloader)}")
     model.cuda()
 
     for epoch in range(const.NUM_EPOCHS):
@@ -170,3 +180,12 @@ if __name__ == "__main__":
         evaluate(args)
     else:
         train(args)
+
+# !python main.py -cfg configs/resnet18.yaml --data /root/dataset/public/Research/DataSet/Anomaly_Detect/MVTec_AD/mvtec_anomaly_detection -cat bottle
+# 报错： ValueError: continuous format is not supported   表现在 eval_once  outputs = outputs.flatten() targets = targets.flatten() auroc_metric.update((outputs, targets))
+# @@ outputs: torch.Size([1245184]) , tensor([-0.4079, -0.4079, -0.4184, -0.4395, -0.4652, -0.4954]),  type: torch.float32
+# @@ targets: torch.Size([1245184]) , tensor([0., 0., 0., 0., 0., 0.], device='cuda:0'),  type: torch.float32  可看出device不一致
+# git issues: https://github.com/gathierry/FastFlow/issues/6
+# 尝试解决：更新scikit-learn=0.24.1 至 requirements.txt scikit-learn=0.24.2一致，未解决。
+# 更新 torch版本与requirements.txt一致，未解决。 pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+# 按照issues 修改：targets = targets.flatten().type(torch.int32) 解决，应该与ignite版本有关，应不想降级版本（0.4.8 to 0.2.0），所以未修改ignite版本。
