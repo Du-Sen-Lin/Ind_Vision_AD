@@ -289,6 +289,7 @@ class PatchCore(pl.LightningModule):
         for feature in features:
             m = torch.nn.AvgPool2d(3, 1, 1)
             embeddings.append(m(feature))
+        print(f"embeddings: {embeddings[0].shape}, {embeddings[1].shape}") # embeddings: torch.Size([8, 512, 125, 125]), torch.Size([8, 1024, 63, 63]); torch.Size([8, 512, 28, 28]), torch.Size([8, 1024, 14, 14])
         embedding = embedding_concat(embeddings[0], embeddings[1])
         self.embedding_list.extend(reshape_embedding(np.array(embedding)))
 
@@ -300,8 +301,12 @@ class PatchCore(pl.LightningModule):
         self.randomprojector = SparseRandomProjection(n_components='auto', eps=0.9) # 'auto' => Johnson-Lindenstrauss lemma
         self.randomprojector.fit(total_embeddings)
         # Coreset Subsampling 核心集二次抽样:稀疏采样 Reduce memory bank
+        print(f"-------------------111111111111111")
         selector = kCenterGreedy(total_embeddings,0,0)
+        print(f"-------------------22222222222222")
+        # 内存不足，就有可能导致程序崩溃
         selected_idx = selector.select_batch(model=self.randomprojector, already_selected=[], N=int(total_embeddings.shape[0]*args.coreset_sampling_ratio))
+        print(f"-------------------3333333333333")
         self.embedding_coreset = total_embeddings[selected_idx]
         
         print('initial embedding size : ', total_embeddings.shape)
@@ -324,7 +329,8 @@ class PatchCore(pl.LightningModule):
         embedding_ = embedding_concat(embeddings[0], embeddings[1])
         embedding_test = np.array(reshape_embedding(np.array(embedding_)))
         score_patches, _ = self.index.search(embedding_test , k=args.n_neighbors)
-        anomaly_map = score_patches[:,0].reshape((28,28))
+        # anomaly_map = score_patches[:,0].reshape((28,28))
+        anomaly_map = score_patches[:,0].reshape((64,64))
         N_b = score_patches[np.argmax(score_patches[:,0])]
         w = (1 - (np.max(np.exp(N_b))/np.sum(np.exp(N_b))))
         score = w*max(score_patches[:,0]) # Image-level score
@@ -355,11 +361,15 @@ def get_args():
     parser.add_argument('--category', default='GM06_08')
     # num_epochs: patchCore 没有 PaDiM 那样的训练阶段（神经网络）,在代码中它只是提取特征而不更新参数。epochs=1
     parser.add_argument('--num_epochs', default=1)
-    parser.add_argument('--batch_size', default=32)
-    parser.add_argument('--load_size', default=256)
-    parser.add_argument('--input_size', default=224)
+    # parser.add_argument('--batch_size', default=32)
+    # parser.add_argument('--load_size', default=256)
+    # parser.add_argument('--input_size', default=224)
+    parser.add_argument('--batch_size', default=8)
+    parser.add_argument('--load_size', default=512)
+    parser.add_argument('--input_size', default=512)    
     # coreset_sampling_ratio 
     parser.add_argument('--coreset_sampling_ratio', default=0.01)
+    # parser.add_argument('--coreset_sampling_ratio', default=0.001)
     parser.add_argument('--project_root_path', default=r'/root/project/ad_algo/anomaly_detection/PatchCore_anomaly_detection/models/patchcore')
     parser.add_argument('--save_src_code', default=True)
     parser.add_argument('--save_anomaly_map', default=True)
