@@ -30,6 +30,7 @@ class FSAD_Dataset_train(Dataset):
         self.batch = batch
         # load dataset
         self.query_dir, self.support_dir = self.load_dataset_folder()
+        # print(f"------ self.query_dir: {self.query_dir[:2]}, \n self.support_dir: {self.support_dir[:2]}")
         # set transforms
         self.transform_x = transforms.Compose([
             transforms.Resize(resize, Image.ANTIALIAS),
@@ -116,6 +117,7 @@ class FSAD_Dataset_train(Dataset):
         self.support_dir = support_dir
 
     def load_dataset_folder(self):
+        """数据集文件夹的加载"""
         phase = 'train' if self.is_train else 'test'
 
         data_img = {}
@@ -172,6 +174,7 @@ class FSAD_Dataset_test(Dataset):
         self.shot = shot
         # load dataset
         self.query_dir, self.support_dir, self.query_mask = self.load_dataset_folder()
+        print(f"----test---- self.query_dir: {self.query_dir[:2]}, \n self.support_dir: {self.query_dir[:2]}, \n self.query_mask: {self.query_mask[:2]}")
         # set transforms
         self.transform_x = transforms.Compose([
             transforms.Resize(resize, Image.ANTIALIAS),

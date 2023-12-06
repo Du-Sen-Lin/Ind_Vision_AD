@@ -6,6 +6,9 @@ import kornia as K
 
 
 def embedding_concat(x, y, use_cuda):
+    """是将两个特征张量 x 和 y 进行拼接。
+    在这个特定的实现中，它通过对 x 进行类似卷积的操作来实现拼接。
+    """
     device = torch.device('cuda' if use_cuda else 'cpu')
     B, C1, H1, W1 = x.size()
     _, C2, H2, W2 = y.size()
