@@ -438,6 +438,7 @@ def get_args():
 if __name__ == '__main__':
     """
     https://www.pudn.com/news/62a7324e3934cd25af830293.html
+    # https://www.zywvvd.com/notes/study/deep-learning/anomaly-detection/patchcore/patchcore/
     补丁嵌入向量(patch embedding vectors):所谓补丁，指的是像素；所谓嵌入，指的是将网络提取的不同特征组合到一块。都是封装的名词罢了。
     faiss: 全称(Facebook AI Similarity Search)是Facebook AI团队开源的针对聚类和相似性搜索库,为稠密向量提供高效相似度搜索和聚类，支持十亿级别向量的搜索，是目前较成熟的近似近邻搜索库。
     Faiss用C++编写,并提供与Numpy完美衔接的Python接口。除此以外,对一些核心算法提供了GPU实现。

@@ -95,7 +95,7 @@
 
 2、当前流行的分类架构通常在早期执行下采样，以减小特征图的大小，从而降低运行时间和内存需求。PDN通过在第一和第二个卷积层后使用分步平均池化层来实现这一点。
 
-3、在训练过程中，PDN（Patch Description Network）是通过在ImageNet数据集上对WideResNet-101进行蒸馏（distillation）而来的，损失函数采用均方误差（MSE，Mean Squared Error）。蒸馏是一种迁移学习的技术，通常用于将一个复杂的模型的知识传递给一个较简单的模型。在这个背景下，WideResNet-101充当教师模型，而PDN则是学生模型。通过使用均方误差作为损失函数，PDN试图在其输出和教师模型的输出之间最小化平方差。
+3、在训练过程中，PDN（Patch Description Network）是通过在ImageNet数据集上对WideResNet-101进行蒸馏（distillation）而来的，损失函数采用均方误差（MSE，Mean Squared Error）。蒸馏是一种迁移学习的技术，通常用于将一个复杂的模型的知识传递给一个较简单的模型。在这个背景下，WideResNet-101充当教师模型，而PDN则是学生模型。通过使用均方误差作为损失函数，PDN试图在其输出和教师模型的输出之间最小化平方差。将 PatchCore [51] 使用的 WideResNet-101 [70] 特征提取到教师网络 T 中。
 ```
 
 ​	
